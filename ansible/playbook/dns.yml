@@ -1,0 +1,7 @@
+---
+- name: Deploy DNS (Bind9 in Docker Compose)
+  hosts: dns
+  become: true
+  roles:
+    - ../roles/dns
+

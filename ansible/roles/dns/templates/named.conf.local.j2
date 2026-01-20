@@ -1,0 +1,5 @@
+zone "{{ dns_zone_name }}" {
+  type master;
+  file "/etc/bind/zones/{{ dns_zone_file }}";
+};
+

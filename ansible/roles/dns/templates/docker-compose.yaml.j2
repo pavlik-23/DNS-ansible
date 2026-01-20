@@ -1,0 +1,35 @@
+services:
+  bind9:
+    build: .
+    container_name: {{ dns_container_name | default('bind9') }}
+    network_mode: "host"
+
+    ulimits:
+      nproc: {{ dns_ulimits_nproc | default(1000) }}
+      nofile: {{ dns_ulimits_nofile | default(4096) }}
+
+    mem_limit: {{ dns_limit_memory | default('2048M') }}
+
+    volumes:
+      - ./zones:/etc/bind/zones:rw
+      - ./named.conf:/etc/bind/named.conf:ro
+      - ./named.conf.options:/etc/bind/named.conf.options:ro
+      - ./named.conf.local:/etc/bind/named.conf.local:ro
+
+    restart: unless-stopped
+
+  bind-exporter:
+    image: prometheuscommunity/bind-exporter:v0.8.0
+#    ports:
+#      - "9119:9119"
+    network_mode: "host"
+    ulimits:
+      nproc: 1000   # max 1000 processes
+      nofile: 4096  # max open file descriptors
+    mem_limit: {{ exporter_limit_memory }}
+
+    command:
+      - '--bind.stats-url=http://127.0.0.1:8053/'
+    depends_on:
+      - bind9
+    restart: unless-stopped

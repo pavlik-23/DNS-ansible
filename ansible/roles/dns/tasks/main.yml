@@ -1,0 +1,3 @@
+---
+- import_tasks: tasks/dns.yml
+#- import_tasks: tasks/verify.yml

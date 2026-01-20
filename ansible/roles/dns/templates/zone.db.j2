@@ -1,0 +1,15 @@
+$TTL {{ dns_ttl }}
+@   IN  SOA {{ dns_soa.ns }} {{ dns_soa.email }} (
+        {{ (dns_a_records | to_json | hash('sha1') | int(base=16) % 4294967295) }} ; serial
+        {{ dns_soa.refresh }} ; refresh
+        {{ dns_soa.retry }} ; retry
+        {{ dns_soa.expire }} ; expire
+        {{ dns_soa.minimum }} ; minimum
+)
+
+@   IN  NS  {{ dns_soa.ns }}
+
+{% for r in (dns_a_records | sort(attribute='name')) %}
+{{ r.name }}  {{ (r.ttl | default(dns_ttl)) }} IN A {{ r.ip }}
+{% endfor %}
+

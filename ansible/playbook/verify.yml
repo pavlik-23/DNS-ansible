@@ -1,0 +1,8 @@
+---
+- name: Verify DNS
+  hosts: dns
+  become: true
+  tasks:
+    - name: Run DNS verification tasks
+      ansible.builtin.import_tasks: ../roles/dns/tasks/verify.yml
+      tags: [verify]

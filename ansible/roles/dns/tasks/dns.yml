@@ -1,0 +1,71 @@
+- name: Ensure project dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ dns_project_dir }}"
+    - "{{ dns_project_dir }}/zones"
+
+- name: Deploy Dockerfile
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ dns_project_dir }}/Dockerfile"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: bind9_recreate
+
+- name: Deploy docker-compose.yaml
+  ansible.builtin.template:
+    src: docker-compose.yaml.j2
+    dest: "{{ dns_project_dir }}/docker-compose.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: bind9_recreate
+
+- name: Deploy named.conf
+  ansible.builtin.template:
+    src: named.conf.j2
+    dest: "{{ dns_project_dir }}/named.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: bind9_recreate
+
+- name: Deploy named.conf.options
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: "{{ dns_project_dir }}/named.conf.options"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: bind9_recreate
+
+- name: Deploy named.conf.local
+  ansible.builtin.template:
+    src: named.conf.local.j2
+    dest: "{{ dns_project_dir }}/named.conf.local"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: bind9_recreate
+
+- name: Deploy zone file
+  ansible.builtin.template:
+    src: zone.db.j2
+    dest: "{{ dns_project_dir }}/zones/{{ dns_zone_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: bind9_reload
+
+- name: Ensure stack is up
+  ansible.builtin.shell: docker compose up -d --build
+  args:
+    chdir: "{{ dns_project_dir }}"
+  changed_when: true
+

@@ -1,0 +1,64 @@
+name: DNS Deploy + Verify
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: "False"
+  ANSIBLE_PLAYBOOK_DEPLOY: "ansible/playbook/dns.yml"
+  ANSIBLE_PLAYBOOK_VERIFY: "ansible/playbook/verify.yml"
+  ANSIBLE_INVENTORY: "ansible/inventory.yml"
+
+jobs:
+  deploy_dns:
+    name: Deploy DNS
+    runs-on: [self-hosted, office, docker]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        shell: bash
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/id_rsa
+          chmod 600 /tmp/id_rsa
+          ssh-add /tmp/id_rsa
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null\n" > ~/.ssh/config
+
+      - name: Deploy via Ansible
+        run: |
+          ansible --version
+          ansible-playbook -i "$ANSIBLE_INVENTORY" "$ANSIBLE_PLAYBOOK_DEPLOY"
+
+  verify_dns:
+    name: Verify DNS
+    runs-on: [self-hosted, office, docker]
+    needs: deploy_dns
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        shell: bash
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/id_rsa
+          chmod 600 /tmp/id_rsa
+          ssh-add /tmp/id_rsa
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null\n" > ~/.ssh/config
+
+      - name: Verify via Ansible
+        run: |
+          ansible --version
+          ansible-playbook -i "$ANSIBLE_INVENTORY" "$ANSIBLE_PLAYBOOK_VERIFY"
+

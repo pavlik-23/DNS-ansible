@@ -1,0 +1,44 @@
+---
+# Docker project
+dns_project_dir: /storage/dns
+
+# Container / image
+dns_container_name: dns1
+dns_image: internetsystemsconsortium/bind9:9.18
+dns_restart_policy: unless-stopped
+exporter_limit_memory: 2048m
+
+# Bind pe ce IP (dacă e gol => 0.0.0.0, dar pentru record dns1 e bine să fie setat)
+dns_bind_ip: ""
+
+# Zone
+dns_zone_name: ansible.zone
+dns_zone_file: service.ansible.zone
+
+# TTL default (secunde)
+dns_ttl: 300
+
+# SOA defaults (secunde)
+dns_soa:
+  ns: "dns1.ansible.zone."
+  email: "hostmaster.ansible.zone."
+  refresh: 3600
+  retry: 900
+  expire: 604800
+  minimum: 300
+
+# NS records (default 1)
+dns_ns_records:
+  - "dns1.ansible.zone."
+
+# A records (aplicații)
+dns_records_a: []
+
+# Wildcard A records (poți avea multiple intrări cu același name)
+dns_wildcard_a: []
+
+# BIND options
+dns_allow_query: "any"
+dns_recursion: "no"
+dns_dnssec_validation: "no"
+

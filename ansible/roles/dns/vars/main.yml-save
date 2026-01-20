@@ -1,0 +1,40 @@
+---
+# unde punem proiectul docker-compose pe host
+dns_project_dir: /storage/dns
+
+# bind container
+dns_container_name: dns1
+dns_image: internetsystemsconsortium/bind9:9.18
+dns_restart_policy: unless-stopped
+
+# pe ce IP să bind-ui porturile (goale => 0.0.0.0)
+# dacă vrei exact ca la tine: dns_bind_ip: "10.192.24.60"
+dns_bind_ip: "10.192.24.60"
+
+# zone
+dns_zone_name: ansible.zone
+dns_zone_file: service.ansible.zone
+dns_ttl: 300
+
+dns_soa:
+  ns: "dns1.ansible.zone."
+  email: "example.test.com."
+  refresh: 3600
+  retry: 900
+  expire: 604800
+  minimum: 300
+
+dns_ns_records:
+  - "dns1.ansible.zone."
+
+# A records (le adaugi aici sau în host_vars/group_vars)
+dns_a_records:
+  - { name: "dns1", ip: "10.192.24.60" }
+  - { name: "app1", ip: "10.10.10.10" }
+  - { name: "git",  ip: "10.10.10.20", ttl: 60 }
+
+# opțional: setări BIND
+dns_allow_query: "any"
+dns_recursion: "no"
+dns_dnssec_validation: "no"
+

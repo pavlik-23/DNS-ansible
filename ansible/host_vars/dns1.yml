@@ -1,0 +1,20 @@
+dns_project_dir: /storage/dns
+dns_container_name: bind9
+
+dns_zone_name: ansible.office
+dns_zone_file: ansible.office.zone
+dns_ttl: 300
+
+dns_soa:
+  ns: "ns1.ansible.office."
+  email: "admin.ansible.office."
+  refresh: 3600
+  retry: 900
+  expire: 604800
+  minimum: 300
+
+dns_a_records:
+  - { name: "ns1",  ip: "10.192.24.62" }
+  - { name: "app1", ip: "10.10.10.10" }
+  - { name: "git",  ip: "10.10.10.20" }
+

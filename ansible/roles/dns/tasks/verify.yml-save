@@ -1,0 +1,109 @@
+# roles/dns/tasks/verify.yml
+- name: Set zone name without trailing dot
+  ansible.builtin.set_fact:
+    _dns_zone: "{{ dns_zone_name | regex_replace('\\.$', '') }}"
+
+- name: Pick DNS server IP from host_vars (ns1) or fallback to ansible_host
+  ansible.builtin.set_fact:
+    _dns_server_ip: >-
+      {{
+        (dns_a_records | selectattr('name', 'equalto', 'ns1') | map(attribute='ip') | first)
+        | default(ansible_host, true)
+      }}
+
+- name: Build expected map fqdn -> list of IPs (supports wildcards and multi-A)
+  ansible.builtin.set_fact:
+    _expect_map: "{{ _expect_map | default({}) | combine({ fqdn: ((_expect_map[fqdn] | default([])) + [item.ip]) }) }}"
+  vars:
+    # 1) daca e wildcard, inlocuim * cu "ci" ca sa putem face query real
+    _name_q: "{{ (item.name | string) | trim | regex_replace('\\*', 'ci') }}"
+    # 2) daca e FQDN cu punct final -> nu mai adaugam zona
+    fqdn: >-
+      {{
+        (_name_q | regex_replace('\\.$', '')) if (_name_q is match('.*\\.$'))
+        else (_name_q ~ '.' ~ _dns_zone)
+      }}
+  loop: "{{ dns_a_records }}"
+  loop_control:
+    label: "{{ item.name }} -> {{ item.ip }}"
+
+# --------------------------
+# BIND config / zone checks
+# --------------------------
+
+- name: named-checkconf (in container)
+  ansible.builtin.command: >
+    docker exec {{ dns_container_name }} named-checkconf -z -c /etc/bind/named.conf
+  changed_when: false
+
+- name: named-checkzone (in container)
+  ansible.builtin.command: >
+    docker exec {{ dns_container_name }} named-checkzone {{ _dns_zone }} /etc/bind/zones/{{ dns_zone_file }}
+  changed_when: false
+
+# --------------------------
+# DIG checks (live)
+# --------------------------
+
+- name: SOA (UDP, norecurse) must answer
+  ansible.builtin.command: >
+    dig @{{ _dns_server_ip }} {{ _dns_zone }} SOA +short +norecurse
+  register: soa_udp
+  changed_when: false
+
+- name: Assert SOA UDP not empty
+  ansible.builtin.assert:
+    that:
+      - (soa_udp.stdout | trim) != ""
+    fail_msg: "SOA UDP is empty for {{ _dns_zone }} via {{ _dns_server_ip }}"
+
+- name: SOA comments (AA flag + no RA)
+  ansible.builtin.command: >
+    dig @{{ _dns_server_ip }} {{ _dns_zone }} SOA +norecurse +noall +comments
+  register: soa_comments
+  changed_when: false
+
+- name: Assert authoritative (AA) and recursion disabled (no RA)
+  ansible.builtin.assert:
+    that:
+      - "'flags:' in soa_comments.stdout"
+      - "soa_comments.stdout is search('flags:.*aa')"
+      - "not (soa_comments.stdout is search('flags:.*ra'))"
+    fail_msg: >
+      SOA flags check failed.
+      Output: {{ soa_comments.stdout | replace('\n',' ') }}
+
+- name: NS must include ns1.<zone>.
+  ansible.builtin.command: >
+    dig @{{ _dns_server_ip }} {{ _dns_zone }} NS +short +norecurse
+  register: ns_out
+  changed_when: false
+
+- name: Assert NS contains ns1.<zone>.
+  ansible.builtin.assert:
+    that:
+      - (ns_out.stdout_lines | select('equalto', 'ns1.' ~ _dns_zone ~ '.') | list | length) > 0
+    fail_msg: "NS for {{ _dns_zone }} does not contain ns1.{{ _dns_zone }}. Output={{ ns_out.stdout | replace('\n',' ') }}"
+
+# A-records checks from host_vars
+- name: Query A records for each fqdn in expect_map
+  ansible.builtin.command: >
+    dig @{{ _dns_server_ip }} {{ item.key }} A +short +norecurse
+  register: dig_a
+  changed_when: false
+  loop: "{{ _expect_map | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} expect={{ item.value | sort | join(',') }}"
+
+- name: Assert A answers match expected (order-insensitive, supports multi-A)
+  ansible.builtin.assert:
+    that:
+      - "(dig_a.results[loop.index0].stdout_lines | map('trim') | reject('equalto','') | list | sort) == (item.value | list | sort)"
+    fail_msg: >-
+      A mismatch for {{ item.key }}.
+      expected={{ item.value | sort | join(', ') }}
+      got={{ dig_a.results[loop.index0].stdout_lines | reject('equalto','') | list | sort | join(', ') }}
+  loop: "{{ _expect_map | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+

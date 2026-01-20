@@ -1,0 +1,16 @@
+FROM debian:bullseye
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bind9 bind9utils dnsutils ca-certificates procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# create runtime dirs
+RUN mkdir -p /var/cache/bind /var/run/named && chown -R bind:bind /var/cache/bind /var/run/named
+
+EXPOSE 53/udp 53/tcp
+
+# Run named in foreground
+CMD ["named","-g","-c","/etc/bind/named.conf","-u","bind"]
+

@@ -1,0 +1,6 @@
+all:
+  children:
+    dns:
+      hosts:
+        dns1:
+          ansible_host: 10.192.24.62
